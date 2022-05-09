@@ -1,0 +1,50 @@
+on: [push]
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    
+    - uses: azure/docker-login@v1
+      with:
+        login-server: piterregistry.azurecr.io
+        username: ${{ secrets.acr_piterregistry_username }}
+        password: ${{ secrets.acr_piterregistry_password }}
+    
+    - name: Build and push image to ACR
+      id: build-image
+      run: |
+        docker build "$GITHUB_WORKSPACE/" -f  "Dockerfile" -t piterregistry.azurecr.io/piterk8s:${{ github.sha }} --label dockerfile-path=Dockerfile
+        docker push piterregistry.azurecr.io/piterk8s:${{ github.sha }}
+    
+    - uses: azure/k8s-set-context@v1
+      with:
+         kubeconfig: ${{ secrets.aks_piterk8s_kubeConfig }}
+      id: login
+    
+    - name: Create namespace
+      run: |
+        namespacePresent=`kubectl get namespace | grep piter-k8s85ad | wc -l`
+        if [ $namespacePresent -eq 0 ]
+        then
+            echo `kubectl create namespace piter-k8s85ad`
+        fi
+
+    - uses: azure/k8s-create-secret@v1
+      with:
+        namespace: piter-k8s85ad
+        container-registry-url: piterregistry.azurecr.io
+        container-registry-username: ${{ secrets.acr_piterregistry_username }}
+        container-registry-password: ${{ secrets.acr_piterregistry_password }}
+        secret-name: piterk8sdockerauth
+       
+    - uses: azure/k8s-deploy@v1.2
+      with:
+        namespace: piter-k8s85ad
+        manifests: |
+          manifests/deployment-7.yml
+          manifests/service-7.yml
+        images: |
+          piterregistry.azurecr.io/piterk8s:${{ github.sha }}
+        imagepullsecrets: |
+          piterk8sdockerauth
