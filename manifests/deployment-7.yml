@@ -1,0 +1,19 @@
+apiVersion : apps/v1
+kind: Deployment
+metadata:
+  name: "piterk8s-1629"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: "piterk8s-1629"
+  template:
+    metadata:
+      labels:
+        app: "piterk8s-1629"
+    spec:
+      containers:
+        - name: "piterk8s-1629"
+          image: "piterregistry.azurecr.io/piterk8s"
+          ports:
+          - containerPort: 80
